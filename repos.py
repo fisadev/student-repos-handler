@@ -92,10 +92,10 @@ class ReposHandler(object):
     def filter_one_repo(self, filter_):
         repos = self.filter_repos([filter_,])
         if not repos:
-            print 'No repo matching the filter'
+            print('No repo matching the filter')
         elif len(repos) > 1:
-            print 'More than one repo matched the filter:'
-            print '\n'.join(repo.long_description() for repo in repos)
+            print('More than one repo matched the filter:')
+            print('\n'.join(repo.long_description() for repo in repos))
         else:
             return repos[0]
 
@@ -103,13 +103,13 @@ class ReposHandler(object):
         repos = self.filter_repos(filters)
 
         for repo in repos:
-            print '-' * 80
-            print repo.long_description()
+            print('-' * 80)
+            print(repo.long_description())
             if 'code' in repo.features:
-                print ' -- Code --'
+                print(' -- Code --')
                 vcs_action(repo, 'code')
             if 'wiki' in repo.features:
-                print ' -- Wiki --'
+                print(' -- Wiki --')
                 vcs_action(repo, 'wiki')
 
     def update(self, *filters):
@@ -179,11 +179,11 @@ class ReposHandler(object):
     def run(self, command, *filters):
         repos = self.filter_repos(filters)
         for repo in repos:
-            print '--', repo, '--'
-            print
+            print('--', repo, '--')
+            print()
             system('(cd %s && %s)' % (repo.path('code', self.repos_root),
                                       command))
-            print
+            print()
 
     def open_vcs_file(self, section, editor, filter_, file_, any_extension=False):
         repo = self.filter_one_repo(filter_)
@@ -203,23 +203,23 @@ class ReposHandler(object):
                     possible_files = [file_path,]
 
             if not possible_files:
-                print 'File does not exists'
+                print('File does not exists')
             elif len(possible_files) > 1:
-                print 'Many files on the wiki with that name:'
-                print '\n'.join(possible_files)
+                print('Many files on the wiki with that name:')
+                print('\n'.join(possible_files))
             else:
                 system('%s %s' % (editor, possible_files[0]))
 
     def list(self, *filters):
         repos = self.filter_repos(filters)
         for repo in repos:
-            print repo.long_description()
+            print(repo.long_description())
 
     def web(self, *filters):
         repos = self.filter_repos(filters)
         for repo in repos:
-            print repo.long_description()
-            print repo.web()
+            print(repo.long_description())
+            print(repo.web())
 
     @classmethod
     def find_repos_config(cls, start_path):
@@ -260,7 +260,7 @@ if __name__ == '__main__':
     current_path = path.abspath('.')
     config_path = ReposHandler.find_repos_config(current_path)
     if not config_path:
-        print 'Unable to find repos.config'
+        print('Unable to find repos.config')
         sys.exit(1)
 
     handler = ReposHandler(ReposHandler.read_repos_from_file(config_path), current_path)
