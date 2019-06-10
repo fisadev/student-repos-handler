@@ -27,6 +27,11 @@ class Repo(object):
                 raise NotImplementedError('Github only supports git')
             else:
                 base_url = 'git@github.com:%s.git' % self.slug
+        elif self.service == 'gitlab':
+            if self.vcs != 'git':
+                raise NotImplementedError('Gitlab only supports git')
+            else:
+                base_url = 'git@gitlab.com:%s.git' % self.slug
         else:
             raise NotImplementedError('Currently %s is not suported as service' % self.service)
 
@@ -35,7 +40,7 @@ class Repo(object):
         elif section == 'wiki':
             if self.service == 'bitbucket':
                 return base_url + '/wiki'
-            elif self.service == 'github':
+            elif self.service in ('github', 'gitlab'):
                 return base_url.replace('.git', '.wiki.git')
         else:
             raise NotImplementedError('Unknown section %s' % section)
@@ -45,6 +50,8 @@ class Repo(object):
             url = 'https://bitbucket.org/%s' % self.slug
         elif self.service == 'github':
             url = 'https://github.com/%s' % self.slug
+        elif self.service == 'gitlab':
+            url = 'https://gitlab.com/%s' % self.slug
         else:
             raise NotImplementedError('Currently %s is not suported as service' % self.service)
 
