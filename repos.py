@@ -193,7 +193,7 @@ class ReposHandler(object):
     def run(self, command, *filters):
         repos = self.filter_repos(filters)
         for repo in repos:
-            print(colored('--', repo, '--', 'green'))
+            print(colored('-- %s --' % repo, 'green'))
             print()
             result = system('(cd %s && %s)' % (repo.path('code', self.repos_root),
                                                command))
