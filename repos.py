@@ -112,10 +112,10 @@ class ReposHandler(object):
     def vcs_action_on_repos(self, filters, vcs_action):
         for repo in self.iterate_filtered_repos(filters):
             if 'code' in repo.features:
-                print(' -- Code --')
+                print(colored(' -- Code --', 'green'))
                 vcs_action(repo, 'code')
             if 'wiki' in repo.features:
-                print(' -- Wiki --')
+                print(colored(' -- Wiki --', 'green'))
                 vcs_action(repo, 'wiki')
 
     def update(self, *filters):
