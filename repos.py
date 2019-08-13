@@ -95,24 +95,22 @@ class ReposHandler(object):
                         if any(f in repo.long_description().lower()
                                for f in filters)]
 
+            if filtered:
+                print(colored('%i repos found' % len(filtered), 'green'))
+            else:
+                print(colored('No repos matching the filters', 'red'))
+
         return filtered
 
-    def filter_one_repo(self, filter_):
-        repos = self.filter_repos([filter_,])
-        if not repos:
-            print(colored('No repo matching the filter', 'red'))
-        elif len(repos) > 1:
-            print(colored('More than one repo matched the filter:', 'red'))
-            print('\n'.join(repo.long_description() for repo in repos))
-        else:
-            return repos[0]
-
-    def vcs_action_on_repos(self, filters, vcs_action):
+    def iterate_filtered_repos(self, filters):
         repos = self.filter_repos(filters)
-
         for repo in repos:
             print(colored('-' * 80, 'green'))
             print(colored(repo.long_description(), 'green'))
+            yield repo
+
+    def vcs_action_on_repos(self, filters, vcs_action):
+        for repo in self.iterate_filtered_repos(filters):
             if 'code' in repo.features:
                 print(' -- Code --')
                 vcs_action(repo, 'code')
@@ -178,21 +176,19 @@ class ReposHandler(object):
         if result != 0:
             print(colored('Error running command', 'red'))
 
-    def code(self, editor, file_, filter_):
-        return self.open_vcs_file('code', editor, filter_, file_, any_extension=False)
+    def code(self, editor, file_, *filters):
+        return self.open_vcs_file('code', editor, filters, file_, any_extension=False)
 
-    def wiki(self, editor, file_, filter_):
-        return self.open_vcs_file('wiki', editor, filter_, file_, any_extension=True)
+    def wiki(self, editor, file_, *filters):
+        return self.open_vcs_file('wiki', editor, filters, file_, any_extension=True)
 
-    def wiki_web(self, browser, url, filter_):
-        repo = self.filter_one_repo(filter_)
-        if repo:
+    def wiki_web(self, browser, url, *filters):
+        for repo in self.iterate_filtered_repos(filters):
             full_url = '%s/%s' % (repo.web('wiki'), url)
             system('%s %s' % (browser, full_url))
 
     def run(self, command, *filters):
-        repos = self.filter_repos(filters)
-        for repo in repos:
+        for repo in self.iterate_filtered_repos(filters):
             print(colored('-- %s --' % repo, 'green'))
             print()
             result = system('(cd %s && %s)' % (repo.path('code', self.repos_root),
@@ -201,9 +197,8 @@ class ReposHandler(object):
                 print(colored('Error running command', 'red'))
             print()
 
-    def open_vcs_file(self, section, editor, filter_, file_, any_extension=False):
-        repo = self.filter_one_repo(filter_)
-        if repo:
+    def open_vcs_file(self, section, editor, filters, file_, any_extension=False):
+        for repo in self.iterate_filtered_repos(filters):
             file_path = path.join(repo.path(section, self.repos_root), file_)
             possible_files = []
 
