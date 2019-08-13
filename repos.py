@@ -105,8 +105,7 @@ class ReposHandler(object):
     def iterate_filtered_repos(self, filters):
         repos = self.filter_repos(filters)
         for repo in repos:
-            print(colored('-' * 80, 'green'))
-            print(colored(repo.long_description(), 'green'))
+            print(colored('-- %s --' % repo, 'green'))
             yield repo
 
     def vcs_action_on_repos(self, filters, vcs_action):
@@ -189,8 +188,6 @@ class ReposHandler(object):
 
     def run(self, command, *filters):
         for repo in self.iterate_filtered_repos(filters):
-            print(colored('-- %s --' % repo, 'green'))
-            print()
             result = system('(cd %s && %s)' % (repo.path('code', self.repos_root),
                                                command))
             if result != 0:
