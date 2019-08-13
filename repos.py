@@ -1,8 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding: utf-8
 import sys
 from os import path, system, listdir
 from collections import namedtuple
+from termcolor import colored
 
 Repo = namedtuple('Repo', 'vcs slug description')
 
@@ -99,9 +100,9 @@ class ReposHandler(object):
     def filter_one_repo(self, filter_):
         repos = self.filter_repos([filter_,])
         if not repos:
-            print('No repo matching the filter')
+            print(colored('No repo matching the filter', 'red'))
         elif len(repos) > 1:
-            print('More than one repo matched the filter:')
+            print(colored('More than one repo matched the filter:', 'red'))
             print('\n'.join(repo.long_description() for repo in repos))
         else:
             return repos[0]
@@ -110,8 +111,8 @@ class ReposHandler(object):
         repos = self.filter_repos(filters)
 
         for repo in repos:
-            print('-' * 80)
-            print(repo.long_description())
+            print(colored('-' * 80, 'green'))
+            print(colored(repo.long_description(), 'green'))
             if 'code' in repo.features:
                 print(' -- Code --')
                 vcs_action(repo, 'code')
@@ -147,7 +148,9 @@ class ReposHandler(object):
 
             command = '%s %s %s' % (clone_command, repo_url, repo_path)
 
-        system(command)
+        result = system(command)
+        if result != 0:
+            print(colored('Error running command', 'red'))
 
     def clean_vcs(self, repo, section):
         repo_path = repo.path(section, self.repos_root)
@@ -158,7 +161,9 @@ class ReposHandler(object):
             clean_command = 'git checkout -- .'
 
         command = '(cd %s && %s)' % (repo_path, clean_command)
-        system(command)
+        result = system(command)
+        if result != 0:
+            print(colored('Error running command', 'red'))
 
     def status_vcs(self, repo, section):
         repo_path = repo.path(section, self.repos_root)
@@ -169,7 +174,9 @@ class ReposHandler(object):
             clean_command = 'git status'
 
         command = '(cd %s && %s)' % (repo_path, clean_command)
-        system(command)
+        result = system(command)
+        if result != 0:
+            print(colored('Error running command', 'red'))
 
     def code(self, editor, file_, filter_):
         return self.open_vcs_file('code', editor, filter_, file_, any_extension=False)
@@ -186,10 +193,12 @@ class ReposHandler(object):
     def run(self, command, *filters):
         repos = self.filter_repos(filters)
         for repo in repos:
-            print('--', repo, '--')
+            print(colored('--', repo, '--', 'green'))
             print()
-            system('(cd %s && %s)' % (repo.path('code', self.repos_root),
-                                      command))
+            result = system('(cd %s && %s)' % (repo.path('code', self.repos_root),
+                                               command))
+            if result != 0:
+                print(colored('Error running command', 'red'))
             print()
 
     def open_vcs_file(self, section, editor, filter_, file_, any_extension=False):
@@ -210,9 +219,9 @@ class ReposHandler(object):
                     possible_files = [file_path,]
 
             if not possible_files:
-                print('File does not exists')
+                print(colored('File does not exists', 'red'))
             elif len(possible_files) > 1:
-                print('Many files on the wiki with that name:')
+                print(colored('Many files on the wiki with that name:', 'red'))
                 print('\n'.join(possible_files))
             else:
                 system('%s %s' % (editor, possible_files[0]))
@@ -267,7 +276,7 @@ if __name__ == '__main__':
     current_path = path.abspath('.')
     config_path = ReposHandler.find_repos_config(current_path)
     if not config_path:
-        print('Unable to find repos.config')
+        print(colored('Unable to find repos.config', 'red'))
         sys.exit(1)
 
     handler = ReposHandler(ReposHandler.read_repos_from_file(config_path), current_path)
