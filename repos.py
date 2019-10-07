@@ -9,12 +9,13 @@ Repo = namedtuple('Repo', 'vcs slug description')
 
 
 class Repo(object):
-    def __init__(self, alias, vcs, features, service, slug, description):
+    def __init__(self, alias, vcs, features, service, slug, server, description):
         self.alias = alias
         self.vcs = vcs
         self.features = features
         self.service = service
         self.slug = slug
+        self.server = server
         self.description = description
 
     def url(self, section):
@@ -186,6 +187,10 @@ class ReposHandler(object):
             full_url = '%s/%s' % (repo.web('wiki'), url)
             system('%s %s' % (browser, full_url))
 
+    def server(self, browser, *filters):
+        for repo in self.iterate_filtered_repos(filters):
+            system('%s %s' % (browser, repo.server))
+
     def run(self, command, *filters):
         for repo in self.iterate_filtered_repos(filters):
             result = system('(cd %s && %s)' % (repo.path('code', self.repos_root),
@@ -248,7 +253,7 @@ class ReposHandler(object):
         with open(file_path) as repos_file:
             for line in repos_file.read().strip().split('\n'):
                 data = line.split('|')
-                alias, vcs, features, service, slug, description = data
+                alias, vcs, features, service, slug, server, description = data
                 features = features.split(',')
 
                 repo = Repo(alias=alias,
@@ -256,6 +261,7 @@ class ReposHandler(object):
                             features=features,
                             service=service,
                             slug=slug,
+                            server=server,
                             description=description)
                 repos.append(repo)
 
