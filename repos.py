@@ -128,7 +128,7 @@ class ReposHandler(object):
         self.vcs_action_on_repos(filters, self.status_vcs)
 
     def update_vcs(self, repo, section):
-        repo_url = repo.url(section)
+        repo_url = repo.clone_url(section)
         repo_path = repo.path(section, self.repos_root)
 
         if path.exists(repo_path):
