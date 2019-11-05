@@ -18,7 +18,7 @@ class Repo(object):
         self.server = server
         self.description = description
 
-    def url(self, section):
+    def clone_url(self, section):
         if self.service == 'bitbucket':
             if self.vcs == 'hg':
                 base_url = 'https://bitbucket.org/%s' % self.slug
@@ -47,7 +47,7 @@ class Repo(object):
         else:
             raise NotImplementedError('Unknown section %s' % section)
 
-    def web(self, section=None):
+    def web_url(self, section=None):
         if self.service == 'bitbucket':
             url = 'https://bitbucket.org/%s' % self.slug
         elif self.service == 'github':
@@ -184,7 +184,7 @@ class ReposHandler(object):
 
     def wiki_web(self, browser, url, *filters):
         for repo in self.iterate_filtered_repos(filters):
-            full_url = '%s/%s' % (repo.web('wiki'), url)
+            full_url = '%s/%s' % (repo.web_url('wiki'), url)
             system('%s %s' % (browser, full_url))
 
     def server(self, browser, *filters):
@@ -228,11 +228,12 @@ class ReposHandler(object):
         for repo in repos:
             print(repo.long_description())
 
-    def web(self, *filters):
-        repos = self.filter_repos(filters)
-        for repo in repos:
+    def show_urls(self, *filters):
+        for repo in self.iterate_filtered_repos(filters):
             print(repo.long_description())
-            print(repo.web())
+            print(repo.web_url())
+            print(repo.web_url('wiki'))
+            print(repo.server)
 
     @classmethod
     def find_repos_config(cls, start_path):
