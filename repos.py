@@ -253,18 +253,19 @@ class ReposHandler(object):
         repos = []
         with open(file_path) as repos_file:
             for line in repos_file.read().strip().split('\n'):
-                data = line.split('|')
-                alias, vcs, features, service, slug, server, description = data
-                features = features.split(',')
+                if not line.startswith('#'):
+                    data = line.split('|')
+                    alias, vcs, features, service, slug, server, description = data
+                    features = features.split(',')
 
-                repo = Repo(alias=alias,
-                            vcs=vcs,
-                            features=features,
-                            service=service,
-                            slug=slug,
-                            server=server,
-                            description=description)
-                repos.append(repo)
+                    repo = Repo(alias=alias,
+                                vcs=vcs,
+                                features=features,
+                                service=service,
+                                slug=slug,
+                                server=server,
+                                description=description)
+                    repos.append(repo)
 
             if len(repos) != len(set(repo.alias for repo in repos)):
                 raise ValueError('There are repos with the same alias')
