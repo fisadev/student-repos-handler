@@ -6,7 +6,7 @@ setup(
     name='students-repos-handler',
     version='1.0.0',
     description='Simple tool to handle multiple repos at once, oriented to the grading of assignments in UCSE DAR',
-    long_description=open('README.rst').read(),
+    long_description=open('README.md').read(),
     author='Juan Pedro Fisanotti',
     author_email='fisadev@gmail.com',
     url='https://github.com/fisadev/student-repos-handler',
