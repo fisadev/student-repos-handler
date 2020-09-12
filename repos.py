@@ -290,6 +290,7 @@ if __name__ == '__main__':
         print('repos code EDITOR FILE FILTERS')
         print('repos wiki EDITOR FILE FILTERS')
         print('repos wiki_web BROWSER URL FILTERS')
+        print('repos server BROWSER FILTERS')
         print('repos run COMMAND FILTERS')
         exit()
     action = sys.argv[1]
