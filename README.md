@@ -6,7 +6,7 @@ Simple tool to handle multiple repos at once, oriented to the grading of assignm
 # Installation
 
 ```
-pip3 install student-repos-handler --user
+pip3 install students-repos-handler --user
 ```
 
 # Usage
