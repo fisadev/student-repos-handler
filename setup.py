@@ -12,7 +12,7 @@ setup(
     url='https://github.com/fisadev/student-repos-handler',
     license='LICENSE.txt',
     python_requires='>=3.4',
-    requires=["termcolor"],
+    install_requires=["termcolor"],
     py_modules=["repos"],
     entry_points={
         "console_scripts": ['repos=repos:main'],
