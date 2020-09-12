@@ -272,7 +272,7 @@ class ReposHandler(object):
         return repos
 
 
-if __name__ == '__main__':
+def main():
     current_path = path.abspath('.')
     config_path = ReposHandler.find_repos_config(current_path)
     if not config_path:
@@ -299,3 +299,6 @@ if __name__ == '__main__':
     if method:
         method(*sys.argv[2:])
 
+
+if __name__ == '__main__':
+    main()
