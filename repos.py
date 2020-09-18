@@ -3,6 +3,8 @@
 import sys
 from os import path, system, listdir
 from collections import namedtuple
+
+import requests
 from termcolor import colored
 
 Repo = namedtuple('Repo', 'vcs slug description')
@@ -191,6 +193,12 @@ class ReposHandler(object):
         for repo in self.iterate_filtered_repos(filters):
             system('%s %s' % (browser, repo.server))
 
+    def revive_server(self, *filters):
+        for repo in self.iterate_filtered_repos(filters):
+            print('Accessing server...')
+            response = requests.get(repo.server)
+            print('Response code:', response.status_code)
+
     def run(self, command, *filters):
         for repo in self.iterate_filtered_repos(filters):
             result = system('(cd %s && %s)' % (repo.path('code', self.repos_root),
@@ -291,6 +299,7 @@ def main():
         print('repos wiki EDITOR FILE FILTERS')
         print('repos wiki_web BROWSER URL FILTERS')
         print('repos server BROWSER FILTERS')
+        print('repos revive_server BROWSER FILTERS')
         print('repos run COMMAND FILTERS')
         exit()
     action = sys.argv[1]
