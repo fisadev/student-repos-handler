@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # coding: utf-8
 import sys
-from os import path, system, listdir
+from os import path, system, listdir, putenv
 from collections import namedtuple
 
 import requests
@@ -201,8 +201,9 @@ class ReposHandler(object):
 
     def run(self, command, *filters):
         for repo in self.iterate_filtered_repos(filters):
-            result = system('(cd %s && %s)' % (repo.path('code', self.repos_root),
-                                               command))
+            repo_path = repo.path('code', self.repos_root)
+            putenv("REPO_PATH", repo_path)
+            result = system('(cd %s && %s)' % (repo_path, command))
             if result != 0:
                 print(colored('Error running command', 'red'))
             print()
