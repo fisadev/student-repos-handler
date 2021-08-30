@@ -308,7 +308,10 @@ def main():
 
     method = getattr(handler, action)
     if method:
-        method(*sys.argv[2:])
+        try:
+            method(*sys.argv[2:])
+        except KeyboardInterrupt:
+            print("Cancelled")
 
 
 if __name__ == '__main__':
