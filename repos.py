@@ -301,6 +301,7 @@ def main():
         print('repos server BROWSER FILTERS')
         print('repos revive_server BROWSER FILTERS')
         print('repos run COMMAND FILTERS')
+        print('repos show_urls FILTERS')
         exit()
     action = sys.argv[1]
 
