@@ -112,13 +112,28 @@ class ReposHandler(object):
             yield repo
 
     def vcs_action_on_repos(self, filters, vcs_action):
+        repos_ok = []
+        repos_err = []
+
         for repo in self.iterate_filtered_repos(filters):
+            code_ok = True
+            wiki_ok = True
+
             if 'code' in repo.features:
                 print(colored(' -- Code --', 'green'))
-                vcs_action(repo, 'code')
+                code_ok = vcs_action(repo, 'code')
             if 'wiki' in repo.features:
                 print(colored(' -- Wiki --', 'green'))
-                vcs_action(repo, 'wiki')
+                wiki_ok = vcs_action(repo, 'wiki')
+
+            if code_ok and wiki_ok:
+                repos_ok.append(repo)
+            else:
+                repos_err.append(repo)
+
+            print()
+
+        self.summary_errors(repos_ok, repos_err)
 
     def update(self, *filters):
         self.vcs_action_on_repos(filters, self.update_vcs)
@@ -151,6 +166,7 @@ class ReposHandler(object):
         result = system(command)
         if result != 0:
             print(colored('Error running command', 'red'))
+        return result == 0
 
     def clean_vcs(self, repo, section):
         repo_path = repo.path(section, self.repos_root)
@@ -164,6 +180,7 @@ class ReposHandler(object):
         result = system(command)
         if result != 0:
             print(colored('Error running command', 'red'))
+        return result == 0
 
     def status_vcs(self, repo, section):
         repo_path = repo.path(section, self.repos_root)
@@ -177,6 +194,7 @@ class ReposHandler(object):
         result = system(command)
         if result != 0:
             print(colored('Error running command', 'red'))
+        return result == 0
 
     def code(self, editor, file_, *filters):
         return self.open_vcs_file('code', editor, filters, file_, any_extension=False)
@@ -200,15 +218,25 @@ class ReposHandler(object):
             print('Response code:', response.status_code)
 
     def run(self, command, *filters):
+        repos_ok = []
+        repos_err = []
         for repo in self.iterate_filtered_repos(filters):
             repo_path = repo.path('code', self.repos_root)
             putenv("REPO_PATH", repo_path)
             result = system('(cd %s && %s)' % (repo_path, command))
-            if result != 0:
+            if result == 0:
+                repos_ok.append(repo)
+            else:
+                repos_err.append(repo)
                 print(colored('Error running command', 'red'))
             print()
 
+        self.summary_errors(repos_ok, repos_err)
+
     def open_vcs_file(self, section, editor, filters, file_, any_extension=False):
+        repos_ok = []
+        repos_err = []
+
         for repo in self.iterate_filtered_repos(filters):
             file_path = path.join(repo.path(section, self.repos_root), file_)
             possible_files = []
@@ -225,12 +253,18 @@ class ReposHandler(object):
                     possible_files = [file_path,]
 
             if not possible_files:
+                repos_err.append(repo)
                 print(colored('File does not exists', 'red'))
             elif len(possible_files) > 1:
+                repos_err.append(repo)
                 print(colored('Many files on the wiki with that name:', 'red'))
                 print('\n'.join(possible_files))
             else:
+                repos_ok.append(repo)
                 system('%s %s' % (editor, possible_files[0]))
+            print()
+
+        self.summary_errors(repos_ok, repos_err)
 
     def list(self, *filters):
         repos = self.filter_repos(filters)
@@ -279,6 +313,14 @@ class ReposHandler(object):
             if len(repos) != len(set(repo.alias for repo in repos)):
                 raise ValueError('There are repos with the same alias')
         return repos
+
+    @classmethod
+    def summary_errors(cls, repos_ok, repos_err):
+        if len(repos_ok) + len(repos_err) > 1:
+            if repos_ok:
+                print(colored('Success:', 'green'), ', '.join(map(str, repos_ok)))
+            if repos_err:
+                print(colored('Errors:', 'red'), ', '.join(map(str, repos_err)))
 
 
 def main():
