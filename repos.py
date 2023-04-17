@@ -556,7 +556,7 @@ def main():
     current_path = Path('.')
     config_path = ReposHandler.find_repos_config(current_path)
     if not config_path:
-        print(colored('Unable to find repos.config', 'red'))
+        print(colored('Unable to find repos.config', Color.ERROR.value))
         exit(1)
 
     handler = ReposHandler.parse_file(config_path, current_path)
