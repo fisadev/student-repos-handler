@@ -570,7 +570,7 @@ def main():
     if method is None:
         print(colored(f'Unknown action: {action}', Color.ERROR.value))
         handler.show_help()
-        exit()
+        exit(1)
 
     if method:
         try:
