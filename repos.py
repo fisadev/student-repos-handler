@@ -54,9 +54,14 @@ class Color(Enum):
     """
     Colors that we can use in the terminal output.
     """
-    SUCCESS = "green"
-    ERROR = "red"
+    GOOD = "green"
+    BAD = "red"
 
+    def print(self, *text_bits, **print_kwargs):
+        """
+        Colorize a text.
+        """
+        return print(*(colored(bit, self.value) for bit in text_bits), **print_kwargs)
 
 
 class Repo:
@@ -69,7 +74,7 @@ class Repo:
         """
         Parse a repos config line and build a Repo instance with that data.
         """
-        data = config_line.split('|')
+        data = config_line.split("|")
         alias = data[0]
 
         if len(data) != 7:
@@ -309,9 +314,9 @@ class ReposHandler(object):
                                for f in filters)]
 
             if filtered:
-                print(colored(f"{len(filtered)} repos found", Color.SUCCESS.value))
+                Color.GOOD.print(len(filtered), "repos found")
             else:
-                print(colored("No repos matching the filters", Color.ERROR.value))
+                Color.BAD.print("No repos matching the filters")
 
         return filtered
 
@@ -321,7 +326,7 @@ class ReposHandler(object):
         """
         repos = self.filter_repos(filters)
         for repo in repos:
-            print(colored(f"-- {repo} --", Color.SUCCESS.value))
+            Color.GOOD.print("<<<<", repo, ">>>>")
             yield repo
 
     def vcs_action_in_repos(self, filters, vcs_action):
@@ -338,18 +343,18 @@ class ReposHandler(object):
             wiki_ok = True
 
             if Section.CODE in repo.sections:
-                print(colored(" -- Code --", Color.SUCCESS.value))
+                Color.GOOD.print("--- Code ---")
                 code_ok = getattr(repo, method_name)(Section.CODE)
 
                 if not code_ok:
-                    print(colored("Error running command", Color.ERROR.value))
+                    Color.BAD.print("Error running command")
 
             if Section.WIKI in repo.sections:
-                print(colored(" -- Wiki --", Color.SUCCESS.value))
+                Color.GOOD.print("--- Wiki ---")
                 wiki_ok = getattr(repo, method_name)(Section.WIKI)
 
                 if not wiki_ok:
-                    print(colored("Error running command", Color.ERROR.value))
+                    Color.BAD.print("Error running command")
 
             if code_ok and wiki_ok:
                 repos_ok.append(repo)
@@ -413,14 +418,14 @@ class ReposHandler(object):
         repos_err = []
 
         for repo in self.iterate_filtered_repos(filters):
-            print('Accessing server...')
+            print("Accessing server...")
             try:
                 repo.revive_server()
                 repos_ok.append(repo)
-                print(colored("Done!", Color.SUCCESS.value))
+                Color.GOOD.print("Done!")
             except:
                 repos_err.append(repo)
-                print(colored("Error:", Color.ERROR.value))
+                Color.BAD.print("Error:")
 
             print()
 
@@ -436,10 +441,11 @@ class ReposHandler(object):
             result = repo.run(command)
             if result == 0:
                 repos_ok.append(repo)
-                print(colored("Done!", Color.SUCCESS.value))
+                Color.GOOD.print("Done!")
             else:
                 repos_err.append(repo)
-                print(colored("Error running command", Color.ERROR.value))
+                Color.BAD.print("Error running command")
+
             print()
 
         self.summary_errors(repos_ok, repos_err)
@@ -460,10 +466,11 @@ class ReposHandler(object):
                 repos_err.append(repo)
 
                 if possible_files:
-                    print(colored("Many files on the wiki with that name:", Color.ERROR.value))
-                    print('\n'.join(map(str, possible_files)))
+                    Color.BAD.print("Many files on the wiki with that name:")
+                    print("\n".join(map(str, possible_files)))
                 else:
-                    print(colored("File does not exists", Color.ERROR.value))
+                    Color.BAD.print("File does not exists")
+
             print()
 
         self.summary_errors(repos_ok, repos_err)
@@ -482,8 +489,8 @@ class ReposHandler(object):
         """
         for repo in self.iterate_filtered_repos(filters):
             print(repo.long_description())
-            print(repo.web_url())
-            print(repo.web_url('wiki'))
+            print(repo.web_url(Section.CODE))
+            print(repo.web_url(Section.WIKI))
             print(repo.server)
 
     @classmethod
@@ -510,12 +517,12 @@ class ReposHandler(object):
         """
         repos = []
         with open(file_path) as repos_file:
-            for line in repos_file.read().strip().split('\n'):
-                if not line.startswith('#') and line.strip():
+            for line in repos_file.read().strip().split("\n"):
+                if not line.startswith("#") and line.strip():
                     repos.append(Repo.parse_line(line, repos_root))
 
             if len(repos) != len(set(repo.alias for repo in repos)):
-                raise ValueError('There are repos with the same alias')
+                raise ValueError("There are repos with the same alias")
 
         return ReposHandler(repos)
 
@@ -526,37 +533,39 @@ class ReposHandler(object):
         """
         if len(repos_ok) + len(repos_err) > 1:
             if repos_ok:
-                print(colored('Success:', Color.SUCCESS.value), ', '.join(map(str, repos_ok)))
+                Color.GOOD.print("Success:", end=" ")
+                print(*repos_ok, sep=", ")
             if repos_err:
-                print(colored('Errors:', Color.ERROR.value), ', '.join(map(str, repos_err)))
+                Color.BAD.print("Errors:", end=" ")
+                print(*repos_err, sep=", ")
 
     @classmethod
     def show_help(cls):
         """
         Show the help message.
         """
-        print(colored('Usage:', Color.SUCCESS.value))
-        print('repos list FILTERS')
-        print('repos status FILTERS')
-        print('repos clean FILTERS')
-        print('repos update FILTERS')
-        print('repos code EDITOR FILE FILTERS')
-        print('repos wiki EDITOR FILE FILTERS')
-        print('repos wiki_web BROWSER URL FILTERS')
-        print('repos server BROWSER FILTERS')
-        print('repos revive_server BROWSER FILTERS')
-        print('repos run "COMMAND" FILTERS')
-        print('repos show_urls FILTERS')
+        Color.GOOD.print("Usage:")
+        print("repos list FILTERS")
+        print("repos status FILTERS")
+        print("repos clean FILTERS")
+        print("repos update FILTERS")
+        print("repos code EDITOR FILE FILTERS")
+        print("repos wiki EDITOR FILE FILTERS")
+        print("repos wiki_web BROWSER URL FILTERS")
+        print("repos server BROWSER FILTERS")
+        print("repos revive_server BROWSER FILTERS")
+        print("repos run \"COMMAND\" FILTERS")
+        print("repos show_urls FILTERS")
 
 
 def main():
     """
     When running from the command line, this is executed.
     """
-    current_path = Path('.')
+    current_path = Path(".")
     config_path = ReposHandler.find_repos_config(current_path)
     if not config_path:
-        print(colored('Unable to find repos.config', Color.ERROR.value))
+        Color.BAD.print("Unable to find repos.config")
         exit(1)
 
     handler = ReposHandler.parse_file(config_path, current_path)
@@ -568,7 +577,7 @@ def main():
     action = sys.argv[1]
     method = getattr(handler, action, None)
     if method is None:
-        print(colored(f'Unknown action: {action}', Color.ERROR.value))
+        Color.BAD.print("Unknown action:", action)
         handler.show_help()
         exit(1)
 
@@ -576,8 +585,8 @@ def main():
         try:
             method(*sys.argv[2:])
         except KeyboardInterrupt:
-            print("Cancelled")
+            Color.BAD.print("Cancelled")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
