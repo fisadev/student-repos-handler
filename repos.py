@@ -530,18 +530,12 @@ class ReposHandler(object):
             if repos_err:
                 print(colored('Errors:', 'red'), ', '.join(map(str, repos_err)))
 
-
-def main():
-    current_path = Path('.')
-    config_path = ReposHandler.find_repos_config(current_path)
-    if not config_path:
-        print(colored('Unable to find repos.config', 'red'))
-        sys.exit(1)
-
-    handler = ReposHandler.parse_file(config_path, current_path)
-
-    if len(sys.argv) < 2:
-        print('Usage:')
+    @classmethod
+    def show_help(cls):
+        """
+        Show the help message.
+        """
+        print(colored('Usage:', Color.SUCCESS.value))
         print('repos list FILTERS')
         print('repos status FILTERS')
         print('repos clean FILTERS')
@@ -551,12 +545,33 @@ def main():
         print('repos wiki_web BROWSER URL FILTERS')
         print('repos server BROWSER FILTERS')
         print('repos revive_server BROWSER FILTERS')
-        print('repos run COMMAND FILTERS')
+        print('repos run "COMMAND" FILTERS')
         print('repos show_urls FILTERS')
-        exit()
-    action = sys.argv[1]
 
-    method = getattr(handler, action)
+
+def main():
+    """
+    When running from the command line, this is executed.
+    """
+    current_path = Path('.')
+    config_path = ReposHandler.find_repos_config(current_path)
+    if not config_path:
+        print(colored('Unable to find repos.config', 'red'))
+        sys.exit(1)
+
+    handler = ReposHandler.parse_file(config_path, current_path)
+
+    if len(sys.argv) < 2:
+        handler.show_help()
+        exit()
+
+    action = sys.argv[1]
+    method = getattr(handler, action, None)
+    if method is None:
+        print(colored(f'Unknown action: {action}', Color.ERROR.value))
+        handler.show_help()
+        exit()
+
     if method:
         try:
             method(*sys.argv[2:])
