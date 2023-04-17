@@ -1,94 +1,304 @@
 #!/usr/bin/env python3
 # coding: utf-8
 import sys
-from os import path, system, listdir, putenv
+from os import system, putenv
 from collections import namedtuple
+from enum import Enum
+from pathlib import Path
 
 import requests
 from termcolor import colored
 
-Repo = namedtuple('Repo', 'vcs slug description')
+
+class BadRepoConfig(Exception):
+    """
+    An error describing the config problem of a repo.
+    """
 
 
-class Repo(object):
-    def __init__(self, alias, vcs, features, service, slug, server, description):
+class Service(Enum):
+    """
+    Supported services where repos can be hosted.
+    """
+    GITHUB = "github"
+    GITLAB = "gitlab"
+    BITBUCKET = "bitbucket"
+
+
+class VCS(Enum):
+    """
+    Supported version control systems.
+    """
+    GIT = "git"
+    HG = "hg"
+
+
+class VCSAction(Enum):
+    """
+    An action that can be executed in a cloned vcs repo.
+    """
+    UPDATE = "update"
+    CLEAN = "clean"
+    STATUS = "status"
+
+
+class Section(Enum):
+    """
+    A section of the repo.
+    """
+    CODE = "code"
+    WIKI = "wiki"
+
+
+class Color(Enum):
+    """
+    Colors that we can use in the terminal output.
+    """
+    SUCCESS = "green"
+    ERROR = "red"
+
+
+
+class Repo:
+    """
+    A repository of code, with a name, and possibly a wiki too, and maybe a server where the code
+    is live and running.
+    """
+    @classmethod
+    def parse_line(cls, config_line, repos_root):
+        """
+        Parse a repos config line and build a Repo instance with that data.
+        """
+        data = config_line.split('|')
+        alias = data[0]
+
+        if len(data) != 7:
+            msg = f"Repo {alias} doesn't honor the format: alias|vcs|sections|service|slug|server|descroption"
+            raise BadRepoConfig(msg)
+
+        alias, vcs, sections, service, slug, server, description = data
+
+        try:
+            vcs = VCS(vcs)
+        except ValueError as err:
+            msg = f"Unsupported vcs in repo {alias}: {vcs}"
+            raise BadRepoConfig(msg) from err
+
+        try:
+            service = Service(service)
+        except ValueError as err:
+            msg = f"Unsupported repo hosting service in repo {alias}: {service}"
+            raise BadRepoConfig(msg) from err
+
+        if service in (Service.GITHUB, Service.GITLAB) and vcs != VCS.GIT:
+            msg = f"Repo {alias} tries to use {service} with a VCS that isn't git"
+            raise BadRepoConfig(msg)
+
+        try:
+            sections = [Section(section) for section in sections.split(",")]
+        except ValueError as err:
+            msg = f"Repo {alias} has invalid sections specified (comma separated list of: code,wiki)"
+            raise BadRepoConfig(msg) from err
+
+        return Repo(
+            alias=alias,
+            vcs=vcs,
+            sections=sections,
+            service=service,
+            slug=slug,
+            server=server,
+            description=description,
+            repos_root=repos_root,
+        )
+
+    def __init__(self, alias, vcs, sections, service, slug, server, description, repos_root):
         self.alias = alias
         self.vcs = vcs
-        self.features = features
+        self.sections = sections
         self.service = service
         self.slug = slug
         self.server = server
         self.description = description
+        self.repos_root = repos_root
 
     def clone_url(self, section):
-        if self.service == 'bitbucket':
-            if self.vcs == 'hg':
-                base_url = 'https://bitbucket.org/%s' % self.slug
-            elif self.vcs == 'git':
-                base_url = 'git@bitbucket.org:%s.git' % self.slug
-        elif self.service == 'github':
-            if self.vcs != 'git':
-                raise NotImplementedError('Github only supports git')
-            else:
-                base_url = 'git@github.com:%s.git' % self.slug
-        elif self.service == 'gitlab':
-            if self.vcs != 'git':
-                raise NotImplementedError('Gitlab only supports git')
-            else:
-                base_url = 'git@gitlab.com:%s.git' % self.slug
-        else:
-            raise NotImplementedError('Currently %s is not suported as service' % self.service)
+        """
+        Build the url used to clone this repo with a vcs.
+        """
+        if self.service == Service.BITBUCKET:
+            if self.vcs == VCS.HG:
+                base_url = f"https://bitbucket.org/{self.slug}"
+            elif self.vcs == VCS.GIT:
+                base_url = f"git@bitbucket.org:{self.slug}.git"
+        elif self.service == Service.GITHUB:
+            # vcs will be git
+            base_url = f"git@github.com:{self.slug}.git"
+        elif self.service == Service.GITLAB:
+            # vcs will be git
+            base_url = f"git@gitlab.com:{self.slug}.git"
 
-        if section == 'code':
+        if section == Section.CODE:
             return base_url
-        elif section == 'wiki':
-            if self.service == 'bitbucket':
-                return base_url + '/wiki'
-            elif self.service in ('github', 'gitlab'):
-                return base_url.replace('.git', '.wiki.git')
-        else:
-            raise NotImplementedError('Unknown section %s' % section)
+        elif section == Section.WIKI:
+            if self.service == Service.BITBUCKET:
+                return f"{base_url}/wiki"
+            elif self.service in (Service.GITHUB, Service.GITLAB):
+                return base_url.replace(".git", ".wiki.git")
 
     def web_url(self, section=None):
-        if self.service == 'bitbucket':
-            url = 'https://bitbucket.org/%s' % self.slug
-        elif self.service == 'github':
-            url = 'https://github.com/%s' % self.slug
-        elif self.service == 'gitlab':
-            url = 'https://gitlab.com/%s' % self.slug
-        else:
-            raise NotImplementedError('Currently %s is not suported as service' % self.service)
+        """
+        Build the url used to visit this repo with a web browser.
+        """
+        if self.service == Service.BITBUCKET:
+            url = f"https://bitbucket.org/{self.slug}"
+        elif self.service == Service.GITHUB:
+            url = f"https://github.com/{self.slug}"
+        elif self.service == Service.GITLAB:
+            url = f"https://gitlab.com/{self.slug}"
 
-        if section == 'wiki':
-            url += '/wiki'
+        if section == Section.WIKI:
+            url += "/wiki"
 
         return url
 
-    def path(self, section, repos_root):
-        base_path = path.join(repos_root, self.alias)
-        if section == 'code':
-            return base_path
-        elif section == 'wiki':
-            return base_path + '-wiki'
-        else:
-            raise NotImplementedError('Unknown section %s' % section)
+    def path(self, section):
+        """
+        Path in which the repo will be cloned locally.
+        """
+        if section == Section.CODE:
+            return self.repos_root / self.alias
+        elif section == Section.WIKI:
+            return self.repos_root / f"{self.alias}-wiki"
 
     def __str__(self):
         return self.alias
 
     def long_description(self):
-        return '%s: %s (%s at %s, %s, %s)' % (self.alias, self.description,
-                                              self.slug, self.service,
-                                              self.vcs,
-                                              '-'.join(self.features))
+        """
+        Repo details described in a human readable string.
+        """
+        return f"{self.alias}: {self.description} ({self.slug} at {self.service.value})"
+
+    def vcs_update(self, section):
+        """
+        Update the cloned repo, or clone it if not present.
+        """
+        repo_url = self.clone_url(section)
+        repo_path = self.path(section)
+
+        if repo_path.exists():
+            if self.vcs == VCS.HG:
+                pull_command = "hg pull -u"
+            elif self.vcs == VCS.GIT:
+                pull_command = "git pull"
+
+            command = f"(cd {repo_path} && {pull_command})"
+        else:
+            if self.vcs == VCS.HG:
+                clone_command = "hg clone"
+            elif self.vcs == VCS.GIT:
+                clone_command = "git clone"
+
+            command = f"{clone_command} {repo_url} {repo_path}"
+
+        result = system(command)
+        return result == 0
+
+    def vcs_clean(self, repo, section):
+        """
+        Clean changes done to the repo.
+        """
+        repo_path = repo.path(section)
+
+        if self.vcs == VCS.HG:
+            clean_command = "hg revert --all --no-backup"
+        elif self.vcs == VCS.GIT:
+            clean_command = "git checkout -- ."
+
+        command = f"(cd {repo_path} && {clean_command})"
+        result = system(command)
+        return result == 0
+
+    def vcs_status(self, repo, section):
+        """
+        Show the status of the repo.
+        """
+        repo_path = repo.path(section)
+
+        if self.vcs == VCS.HG:
+            status_command = "hg status"
+        elif self.vcs == VCS.GIT:
+            status_command = "git status"
+
+        command = f"(cd {repo_path} && {status_command})"
+        result = system(command)
+        return result == 0
+
+    def open_vcs_file(self, section, editor, file_, any_extension=False):
+        """
+        Find and open a specified file from the repo.
+        """
+        file_path = self.path(section) / file_
+        possible_files = []
+
+        if any_extension:
+            parent_dir = file_path.parent
+
+            if parent_dir.exists():
+                possible_files = list(parent_dir.glob(f"{file_.name}.*"))
+        else:
+            if file_path.exists():
+                possible_files = [file_path]
+
+        if len(possible_files) == 1:
+            system(f"{editor} {possible_files[0]}")
+            return True, possible_files
+        else:
+            return False, possible_files
+
+    def navigate_wiki(self, browser, url):
+        """
+        Open a browser to a specific page of the wiki.
+        """
+        full_url = f"{self.web_url(Section.WIKI)}/{url}"
+        system(f"{browser} {full_url}")
+
+    def navigate_server(self, browser):
+        """
+        Open a browser to the web server running the code.
+        """
+        system(f"{browser} {self.server}")
+
+    def revive_server(self):
+        """
+        Do a background request to the server running the code, so it wakes up if it was put to
+        sleep.
+        """
+        response = requests.get(self.server)
+        response.raise_for_status()
+
+    def run(self, command):
+        """
+        Run a command inside the repo.
+        """
+        repo_path = self.path(Section.CODE)
+        putenv("REPO_PATH", repo_path)
+        result = system(f"(cd {repo_path} && {command})")
+        return result
 
 
 class ReposHandler(object):
-    def __init__(self, repos, repos_root):
+    """
+    The app itself, exposing a set of actions that you can run over a set of repos.
+    """
+    def __init__(self, repos):
         self.repos = repos
-        self.repos_root = repos_root
 
     def filter_repos(self, filters):
+        """
+        Obtain the list of repos that match a given filter.
+        IF no filter is specified, then all repos are returned.
+        """
         if not filters:
             filtered = self.repos
         else:
@@ -99,32 +309,47 @@ class ReposHandler(object):
                                for f in filters)]
 
             if filtered:
-                print(colored('%i repos found' % len(filtered), 'green'))
+                print(colored(f"{len(filtered)} repos found", Color.SUCCESS.value))
             else:
-                print(colored('No repos matching the filters', 'red'))
+                print(colored("No repos matching the filters", Color.ERROR.value))
 
         return filtered
 
     def iterate_filtered_repos(self, filters):
+        """
+        Iterate over the results of filter_repos, printing the title of the repo on each step.
+        """
         repos = self.filter_repos(filters)
         for repo in repos:
-            print(colored('-- %s --' % repo, 'green'))
+            print(colored(f"-- {repo} --", Color.SUCCESS.value))
             yield repo
 
-    def vcs_action_on_repos(self, filters, vcs_action):
+    def vcs_action_in_repos(self, filters, vcs_action):
+        """
+        Run a vcs action in a set of filtered repos.
+        """
         repos_ok = []
         repos_err = []
+
+        method_name = f"vcs_{vcs_action.value}"
 
         for repo in self.iterate_filtered_repos(filters):
             code_ok = True
             wiki_ok = True
 
-            if 'code' in repo.features:
-                print(colored(' -- Code --', 'green'))
-                code_ok = vcs_action(repo, 'code')
-            if 'wiki' in repo.features:
-                print(colored(' -- Wiki --', 'green'))
-                wiki_ok = vcs_action(repo, 'wiki')
+            if Section.CODE in repo.sections:
+                print(colored(" -- Code --", Color.SUCCESS.value))
+                code_ok = getattr(repo, method_name)(Section.CODE)
+
+                if not code_ok:
+                    print(colored("Error running command", Color.ERROR.value))
+
+            if Section.WIKI in repo.sections:
+                print(colored(" -- Wiki --", Color.SUCCESS.value))
+                wiki_ok = getattr(repo, method_name)(Section.WIKI)
+
+                if not wiki_ok:
+                    print(colored("Error running command", Color.ERROR.value))
 
             if code_ok and wiki_ok:
                 repos_ok.append(repo)
@@ -136,142 +361,125 @@ class ReposHandler(object):
         self.summary_errors(repos_ok, repos_err)
 
     def update(self, *filters):
-        self.vcs_action_on_repos(filters, self.update_vcs)
+        """
+        Do a vcs update over a set of filtered repos.
+        """
+        self.vcs_action_in_repos(filters, VCSAction.UPDATE)
 
     def clean(self, *filters):
-        self.vcs_action_on_repos(filters, self.clean_vcs)
+        """
+        Do a vcs clean over a set of filtered repos.
+        """
+        self.vcs_action_in_repos(filters, VCSAction.CLEAN)
 
     def status(self, *filters):
-        self.vcs_action_on_repos(filters, self.status_vcs)
-
-    def update_vcs(self, repo, section):
-        repo_url = repo.clone_url(section)
-        repo_path = repo.path(section, self.repos_root)
-
-        if path.exists(repo_path):
-            if repo.vcs == 'hg':
-                pull_command = 'hg pull -u'
-            elif repo.vcs == 'git':
-                pull_command = 'git pull'
-
-            command = '(cd %s && %s)' % (repo_path, pull_command)
-        else:
-            if repo.vcs == 'hg':
-                clone_command = 'hg clone'
-            elif repo.vcs == 'git':
-                clone_command = 'git clone'
-
-            command = '%s %s %s' % (clone_command, repo_url, repo_path)
-
-        result = system(command)
-        if result != 0:
-            print(colored('Error running command', 'red'))
-        return result == 0
-
-    def clean_vcs(self, repo, section):
-        repo_path = repo.path(section, self.repos_root)
-
-        if repo.vcs == 'hg':
-            clean_command = 'hg revert --all --no-backup'
-        elif repo.vcs == 'git':
-            clean_command = 'git checkout -- .'
-
-        command = '(cd %s && %s)' % (repo_path, clean_command)
-        result = system(command)
-        if result != 0:
-            print(colored('Error running command', 'red'))
-        return result == 0
-
-    def status_vcs(self, repo, section):
-        repo_path = repo.path(section, self.repos_root)
-
-        if repo.vcs == 'hg':
-            clean_command = 'hg status'
-        elif repo.vcs == 'git':
-            clean_command = 'git status'
-
-        command = '(cd %s && %s)' % (repo_path, clean_command)
-        result = system(command)
-        if result != 0:
-            print(colored('Error running command', 'red'))
-        return result == 0
+        """
+        Do a vcs status over a set of filtered repos.
+        """
+        self.vcs_action_in_repos(filters, VCSAction.STATUS)
 
     def code(self, editor, file_, *filters):
-        return self.open_vcs_file('code', editor, filters, file_, any_extension=False)
+        """
+        Open a vcs code file over a set of filtered repos.
+        """
+        return self.open_vcs_file(Section.CODE, editor, filters, file_, any_extension=False)
 
     def wiki(self, editor, file_, *filters):
-        return self.open_vcs_file('wiki', editor, filters, file_, any_extension=True)
+        """
+        Open a vcs wiki file over a set of filtered repos.
+        """
+        return self.open_vcs_file(Section.WIKI, editor, filters, file_, any_extension=True)
 
     def wiki_web(self, browser, url, *filters):
+        """
+        Navigate to a specific page of the wiki of a set of filtered repos.
+        """
         for repo in self.iterate_filtered_repos(filters):
-            full_url = '%s/%s' % (repo.web_url('wiki'), url)
-            system('%s %s' % (browser, full_url))
+            repo.navigate_wiki(browser, url)
 
     def server(self, browser, *filters):
+        """
+        Navigate to the server running the code of a set of filtered repos.
+        """
         for repo in self.iterate_filtered_repos(filters):
-            system('%s %s' % (browser, repo.server))
+            repo.navigate_server(browser)
 
     def revive_server(self, *filters):
+        """
+        Do a request to the server running the code of a set of filtered repos, to wake it up if
+        it's sleeping.
+        """
+        repos_ok = []
+        repos_err = []
+
         for repo in self.iterate_filtered_repos(filters):
             print('Accessing server...')
-            response = requests.get(repo.server)
-            print('Response code:', response.status_code)
+            try:
+                repo.revive_server()
+                repos_ok.append(repo)
+                print(colored("Done!", Color.SUCCESS.value))
+            except:
+                repos_err.append(repo)
+                print(colored("Error:", Color.ERROR.value))
+
+            print()
+
+        self.summary_errors(repos_ok, repos_err)
 
     def run(self, command, *filters):
+        """
+        Run a command inside the folders of a set of filtered repos.
+        """
         repos_ok = []
         repos_err = []
         for repo in self.iterate_filtered_repos(filters):
-            repo_path = repo.path('code', self.repos_root)
-            putenv("REPO_PATH", repo_path)
-            result = system('(cd %s && %s)' % (repo_path, command))
+            result = repo.run(command)
             if result == 0:
                 repos_ok.append(repo)
+                print(colored("Done!", Color.SUCCESS.value))
             else:
                 repos_err.append(repo)
-                print(colored('Error running command', 'red'))
+                print(colored("Error running command", Color.ERROR.value))
             print()
 
         self.summary_errors(repos_ok, repos_err)
 
     def open_vcs_file(self, section, editor, filters, file_, any_extension=False):
+        """
+        Open files of a set of filtered repos.
+        """
         repos_ok = []
         repos_err = []
 
         for repo in self.iterate_filtered_repos(filters):
-            file_path = path.join(repo.path(section, self.repos_root), file_)
-            possible_files = []
-
-            if any_extension:
-                directory = path.dirname(file_path)
-
-                if path.exists(directory):
-                    possible_files = [path.join(directory, file_name)
-                                      for file_name in listdir(directory)
-                                      if file_name.split('.')[0] == file_]
-            else:
-                if path.exists(file_path):
-                    possible_files = [file_path,]
-
-            if not possible_files:
-                repos_err.append(repo)
-                print(colored('File does not exists', 'red'))
-            elif len(possible_files) > 1:
-                repos_err.append(repo)
-                print(colored('Many files on the wiki with that name:', 'red'))
-                print('\n'.join(possible_files))
-            else:
+            was_able_to_open, possible_files = repo.open_vcs_file(section, editor, file_,
+                                                                  any_extension=any_extension)
+            if was_able_to_open:
                 repos_ok.append(repo)
-                system('%s %s' % (editor, possible_files[0]))
+            else:
+                repos_err.append(repo)
+
+                if possible_files:
+                    print(colored("Many files on the wiki with that name:", Color.ERROR.value))
+                    print('\n'.join(map(str, possible_files)))
+                else:
+                    print(colored("File does not exists", Color.ERROR.value))
             print()
 
         self.summary_errors(repos_ok, repos_err)
 
     def list(self, *filters):
+        """
+        Just list filtered repos info.
+        """
         repos = self.filter_repos(filters)
         for repo in repos:
             print(repo.long_description())
 
     def show_urls(self, *filters):
+        """
+        Just list the urls of filtered repos.
+        """
         for repo in self.iterate_filtered_repos(filters):
             print(repo.long_description())
             print(repo.web_url())
@@ -280,42 +488,42 @@ class ReposHandler(object):
 
     @classmethod
     def find_repos_config(cls, start_path):
+        """
+        Find the closest repos config file, navigating from the current dir backwards.
+        """
         current_path = start_path
         while current_path:
-            config_path = path.join(current_path, 'repos.config')
-            if path.exists(config_path):
+            config_path = current_path / "repos.config"
+            if config_path.exists():
                 return config_path
             else:
-                if current_path == '/':
+                parent = current_path.parent
+                if current_path == parent:
                     current_path = None
                 else:
-                    current_path = path.dirname(current_path)
+                    current_path = parent
 
     @classmethod
-    def read_repos_from_file(cls, file_path):
+    def parse_file(cls, file_path, repos_root):
+        """
+        Parse a repos config file, and return the ReposHandler instance.
+        """
         repos = []
         with open(file_path) as repos_file:
             for line in repos_file.read().strip().split('\n'):
-                if not line.startswith('#'):
-                    data = line.split('|')
-                    alias, vcs, features, service, slug, server, description = data
-                    features = features.split(',')
-
-                    repo = Repo(alias=alias,
-                                vcs=vcs,
-                                features=features,
-                                service=service,
-                                slug=slug,
-                                server=server,
-                                description=description)
-                    repos.append(repo)
+                if not line.startswith('#') and line.strip():
+                    repos.append(Repo.parse_line(line, repos_root))
 
             if len(repos) != len(set(repo.alias for repo in repos)):
                 raise ValueError('There are repos with the same alias')
-        return repos
+
+        return ReposHandler(repos)
 
     @classmethod
     def summary_errors(cls, repos_ok, repos_err):
+        """
+        Show a summary of ok and errors from actions in a set of repos.
+        """
         if len(repos_ok) + len(repos_err) > 1:
             if repos_ok:
                 print(colored('Success:', 'green'), ', '.join(map(str, repos_ok)))
@@ -324,13 +532,13 @@ class ReposHandler(object):
 
 
 def main():
-    current_path = path.abspath('.')
+    current_path = Path('.')
     config_path = ReposHandler.find_repos_config(current_path)
     if not config_path:
         print(colored('Unable to find repos.config', 'red'))
         sys.exit(1)
 
-    handler = ReposHandler(ReposHandler.read_repos_from_file(config_path), current_path)
+    handler = ReposHandler.parse_file(config_path, current_path)
 
     if len(sys.argv) < 2:
         print('Usage:')
