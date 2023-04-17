@@ -526,9 +526,9 @@ class ReposHandler(object):
         """
         if len(repos_ok) + len(repos_err) > 1:
             if repos_ok:
-                print(colored('Success:', 'green'), ', '.join(map(str, repos_ok)))
+                print(colored('Success:', Color.SUCCESS.value), ', '.join(map(str, repos_ok)))
             if repos_err:
-                print(colored('Errors:', 'red'), ', '.join(map(str, repos_err)))
+                print(colored('Errors:', Color.ERROR.value), ', '.join(map(str, repos_err)))
 
     @classmethod
     def show_help(cls):
