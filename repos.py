@@ -315,6 +315,7 @@ class ReposHandler(object):
 
             if filtered:
                 Color.GOOD.print(len(filtered), "repos found")
+                print()
             else:
                 Color.BAD.print("No repos matching the filters")
 
@@ -475,23 +476,23 @@ class ReposHandler(object):
 
         self.summary_errors(repos_ok, repos_err)
 
-    def list(self, *filters):
+    def show(self, *filters):
         """
-        Just list filtered repos info.
-        """
-        repos = self.filter_repos(filters)
-        for repo in repos:
-            print(repo.long_description())
-
-    def show_urls(self, *filters):
-        """
-        Just list the urls of filtered repos.
+        Just show filtered repos info.
         """
         for repo in self.iterate_filtered_repos(filters):
             print(repo.long_description())
-            print(repo.web_url(Section.CODE))
-            print(repo.web_url(Section.WIKI))
-            print(repo.server)
+            if Section.CODE in repo.sections:
+                Color.GOOD.print("Code:", end=" ")
+                print(repo.web_url(Section.CODE))
+            if Section.WIKI in repo.sections:
+                Color.GOOD.print("Wiki:", end=" ")
+                print(repo.web_url(Section.WIKI))
+            if repo.server:
+                Color.GOOD.print("Server:", end=" ")
+                print(repo.server)
+
+            print()
 
     @classmethod
     def find_repos_config(cls, start_path):
@@ -545,7 +546,7 @@ class ReposHandler(object):
         Show the help message.
         """
         Color.GOOD.print("Usage:")
-        print("repos list FILTERS")
+        print("repos show FILTERS")
         print("repos status FILTERS")
         print("repos clean FILTERS")
         print("repos update FILTERS")
@@ -555,7 +556,6 @@ class ReposHandler(object):
         print("repos server BROWSER FILTERS")
         print("repos revive_server BROWSER FILTERS")
         print("repos run \"COMMAND\" FILTERS")
-        print("repos show_urls FILTERS")
 
 
 def main():
