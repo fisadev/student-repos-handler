@@ -315,7 +315,6 @@ class ReposHandler(object):
 
             if filtered:
                 Color.GOOD.print(len(filtered), "repos found")
-                print()
             else:
                 Color.BAD.print("No repos matching the filters")
 
@@ -327,7 +326,9 @@ class ReposHandler(object):
         """
         repos = self.filter_repos(filters)
         for repo in repos:
+            print()
             Color.GOOD.print("<<<<", repo, ">>>>")
+            print()
             yield repo
 
     def vcs_action_in_repos(self, filters, vcs_action):
@@ -361,8 +362,6 @@ class ReposHandler(object):
                 repos_ok.append(repo)
             else:
                 repos_err.append(repo)
-
-            print()
 
         self.summary_errors(repos_ok, repos_err)
 
@@ -428,8 +427,6 @@ class ReposHandler(object):
                 repos_err.append(repo)
                 Color.BAD.print("Error:")
 
-            print()
-
         self.summary_errors(repos_ok, repos_err)
 
     def run(self, command, *filters):
@@ -439,6 +436,7 @@ class ReposHandler(object):
         repos_ok = []
         repos_err = []
         for repo in self.iterate_filtered_repos(filters):
+            Color.GOOD.print("Run:", command)
             result = repo.run(command)
             if result == 0:
                 repos_ok.append(repo)
@@ -446,8 +444,6 @@ class ReposHandler(object):
             else:
                 repos_err.append(repo)
                 Color.BAD.print("Error running command")
-
-            print()
 
         self.summary_errors(repos_ok, repos_err)
 
@@ -472,8 +468,6 @@ class ReposHandler(object):
                 else:
                     Color.BAD.print("File does not exists")
 
-            print()
-
         self.summary_errors(repos_ok, repos_err)
 
     def show(self, *filters):
@@ -491,8 +485,6 @@ class ReposHandler(object):
             if repo.server:
                 Color.GOOD.print("Server:", end=" ")
                 print(repo.server)
-
-            print()
 
     @classmethod
     def find_repos_config(cls, start_path):
@@ -532,6 +524,7 @@ class ReposHandler(object):
         """
         Show a summary of ok and errors from actions in a set of repos.
         """
+        print()
         if len(repos_ok) + len(repos_err) > 1:
             if repos_ok:
                 Color.GOOD.print("Success:", end=" ")
@@ -539,13 +532,16 @@ class ReposHandler(object):
             if repos_err:
                 Color.BAD.print("Errors:", end=" ")
                 print(*repos_err, sep=", ")
+        print()
 
     @classmethod
     def show_help(cls):
         """
         Show the help message.
         """
+        print()
         Color.GOOD.print("Usage:")
+        print()
         print("repos show FILTERS")
         print("repos status FILTERS")
         print("repos clean FILTERS")
@@ -556,6 +552,7 @@ class ReposHandler(object):
         print("repos server BROWSER FILTERS")
         print("repos revive_server BROWSER FILTERS")
         print("repos run \"COMMAND\" FILTERS")
+        print()
 
 
 def main():
@@ -565,7 +562,9 @@ def main():
     current_path = Path(".")
     config_path = ReposHandler.find_repos_config(current_path)
     if not config_path:
+        print()
         Color.BAD.print("Unable to find repos.config")
+        print()
         exit(1)
 
     handler = ReposHandler.parse_file(config_path, current_path)
@@ -577,7 +576,9 @@ def main():
     action = sys.argv[1]
     method = getattr(handler, action, None)
     if method is None:
+        print()
         Color.BAD.print("Unknown action:", action)
+
         handler.show_help()
         exit(1)
 
@@ -585,7 +586,10 @@ def main():
         try:
             method(*sys.argv[2:])
         except KeyboardInterrupt:
+            print()
             Color.BAD.print("Cancelled")
+            print()
+            exit(1)
 
 
 if __name__ == "__main__":
