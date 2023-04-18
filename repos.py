@@ -250,7 +250,7 @@ class Repo:
             parent_dir = file_path.parent
 
             if parent_dir.exists():
-                possible_files = list(parent_dir.glob(f"{file_.name}.*"))
+                possible_files = list(parent_dir.glob(f"{file_}.*"))
         else:
             if file_path.exists():
                 possible_files = [file_path]
