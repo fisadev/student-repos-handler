@@ -209,11 +209,11 @@ class Repo:
         result = system(command)
         return result == 0
 
-    def vcs_clean(self, repo, section):
+    def vcs_clean(self, section):
         """
         Clean changes done to the repo.
         """
-        repo_path = repo.path(section)
+        repo_path = self.path(section)
 
         if self.vcs == VCS.HG:
             clean_command = "hg revert --all --no-backup"
@@ -224,11 +224,11 @@ class Repo:
         result = system(command)
         return result == 0
 
-    def vcs_status(self, repo, section):
+    def vcs_status(self, section):
         """
         Show the status of the repo.
         """
-        repo_path = repo.path(section)
+        repo_path = self.path(section)
 
         if self.vcs == VCS.HG:
             status_command = "hg status"
