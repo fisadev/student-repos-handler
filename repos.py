@@ -184,66 +184,55 @@ class Repo:
         """
         return f"{self.alias}: {self.description} ({self.slug} at {self.service.value})"
 
-    def vcs_update(self, section):
+    def vcs_update_command(self, section):
         """
-        Update the cloned repo, or clone it if not present.
+        Command to update the cloned repo, or clone it if not present.
         """
-        repo_url = self.clone_url(section)
         repo_path = self.path(section)
 
         if repo_path.exists():
             if self.vcs == VCS.HG:
-                pull_command = "hg pull -u"
+                command = "hg pull -u"
             elif self.vcs == VCS.GIT:
-                pull_command = "git pull"
-
-            command = f"(cd {repo_path} && {pull_command})"
+                command = "git pull"
         else:
             if self.vcs == VCS.HG:
                 clone_command = "hg clone"
             elif self.vcs == VCS.GIT:
                 clone_command = "git clone"
 
-            command = f"{clone_command} {repo_url} {repo_path}"
+            command = f"{clone_command} {repo_path}"
 
-        result = system(command)
-        return result == 0
+        return command
 
-    def vcs_clean(self, section):
+    def vcs_clean_command(self, section):
         """
-        Clean changes done to the repo.
+        Command to clean changes done to the repo.
         """
-        repo_path = self.path(section)
-
         if self.vcs == VCS.HG:
-            clean_command = "hg revert --all --no-backup"
+            command = "hg revert --all --no-backup"
         elif self.vcs == VCS.GIT:
-            clean_command = "git checkout -- ."
+            command = "git checkout -- ."
 
-        command = f"(cd {repo_path} && {clean_command})"
-        result = system(command)
-        return result == 0
+        return command
 
-    def vcs_status(self, section):
+    def vcs_status_command(self, section):
         """
-        Show the status of the repo.
+        Command to show the status of the repo.
         """
-        repo_path = self.path(section)
-
         if self.vcs == VCS.HG:
-            status_command = "hg status"
+            command = "hg status"
         elif self.vcs == VCS.GIT:
-            status_command = "git status"
+            command = "git status"
 
-        command = f"(cd {repo_path} && {status_command})"
-        result = system(command)
-        return result == 0
+        return command
 
     def open_vcs_file(self, section, editor, file_, any_extension=False):
         """
         Find and open a specified file from the repo.
         """
-        file_path = self.path(section) / file_
+        repo_path = self.path(section)
+        file_path = repo_path / file_
         possible_files = []
 
         if any_extension:
@@ -256,8 +245,10 @@ class Repo:
                 possible_files = [file_path]
 
         if len(possible_files) == 1:
-            system(f"{editor} {possible_files[0]}")
-            return True, possible_files
+            winner_relative_path = possible_files[0].relative_to(repo_path)
+            command = f"{editor} {winner_relative_path}"
+            success = self.run(command, section)
+            return success, possible_files
         else:
             return False, possible_files
 
@@ -266,13 +257,13 @@ class Repo:
         Open a browser to a specific page of the wiki.
         """
         full_url = f"{self.web_url(Section.WIKI)}/{url}"
-        system(f"{browser} {full_url}")
+        return self.run(f"{browser} {full_url}")
 
     def navigate_server(self, browser):
         """
         Open a browser to the web server running the code.
         """
-        system(f"{browser} {self.server}")
+        return self.run(f"{browser} {self.server}")
 
     def revive_server(self):
         """
@@ -282,14 +273,36 @@ class Repo:
         response = requests.get(self.server)
         response.raise_for_status()
 
-    def run(self, command):
+    def run(self, command, section=Section.CODE):
         """
         Run a command inside the repo.
         """
-        repo_path = self.path(Section.CODE)
+        repo_path = self.path(section)
         putenv("REPO_PATH", repo_path)
+
+        Color.GOOD.print("Run:", command)
+        print()
+
         result = system(f"(cd {repo_path} && {command})")
-        return result
+        success = result == 0
+
+        print()
+        if success:
+            Color.GOOD.print("Done!")
+        else:
+            Color.BAD.print("Error running command")
+        print()
+
+        return success
+
+    def matches(self, filters):
+        """
+        Decide wether a filter applies to this repo.
+        """
+        filters = [f.lower() for f in filters]
+
+        long_description = self.long_description().lower()
+        return any(f in long_description for f in filters)
 
 
 class ReposHandler(object):
@@ -307,11 +320,8 @@ class ReposHandler(object):
         if not filters:
             filtered = self.repos
         else:
-            filters = [f.lower() for f in filters]
-
             filtered = [repo for repo in self.repos
-                        if any(f in repo.long_description().lower()
-                               for f in filters)]
+                        if repo.matches(filters)]
 
             if filtered:
                 Color.GOOD.print(len(filtered), "repos found")
@@ -338,7 +348,7 @@ class ReposHandler(object):
         repos_ok = []
         repos_err = []
 
-        method_name = f"vcs_{vcs_action.value}"
+        method_name = f"vcs_{vcs_action.value}_command"
 
         for repo in self.iterate_filtered_repos(filters):
             code_ok = True
@@ -346,17 +356,15 @@ class ReposHandler(object):
 
             if Section.CODE in repo.sections:
                 Color.GOOD.print("--- Code ---")
-                code_ok = getattr(repo, method_name)(Section.CODE)
+                code_command = getattr(repo, method_name)(Section.CODE)
 
-                if not code_ok:
-                    Color.BAD.print("Error running command")
+                code_ok = repo.run(code_command)
 
             if Section.WIKI in repo.sections:
                 Color.GOOD.print("--- Wiki ---")
-                wiki_ok = getattr(repo, method_name)(Section.WIKI)
+                wiki_command = getattr(repo, method_name)(Section.WIKI)
 
-                if not wiki_ok:
-                    Color.BAD.print("Error running command")
+                wiki_ok = repo.run(wiki_command)
 
             if code_ok and wiki_ok:
                 repos_ok.append(repo)
@@ -436,14 +444,11 @@ class ReposHandler(object):
         repos_ok = []
         repos_err = []
         for repo in self.iterate_filtered_repos(filters):
-            Color.GOOD.print("Run:", command)
-            result = repo.run(command)
-            if result == 0:
+            success = repo.run(command)
+            if success:
                 repos_ok.append(repo)
-                Color.GOOD.print("Done!")
             else:
                 repos_err.append(repo)
-                Color.BAD.print("Error running command")
 
         self.summary_errors(repos_ok, repos_err)
 
@@ -535,13 +540,14 @@ class ReposHandler(object):
         print()
 
     @classmethod
-    def show_help(cls):
+    def help(cls):
         """
         Show the help message.
         """
         print()
         Color.GOOD.print("Usage:")
         print()
+        print("repos help")
         print("repos show FILTERS")
         print("repos status FILTERS")
         print("repos clean FILTERS")
@@ -570,7 +576,7 @@ def main():
     handler = ReposHandler.parse_file(config_path, current_path)
 
     if len(sys.argv) < 2:
-        handler.show_help()
+        handler.help()
         exit()
 
     action = sys.argv[1]
@@ -579,7 +585,7 @@ def main():
         print()
         Color.BAD.print("Unknown action:", action)
 
-        handler.show_help()
+        handler.help()
         exit(1)
 
     if method:
