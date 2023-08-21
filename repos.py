@@ -196,12 +196,15 @@ class Repo:
             elif self.vcs == VCS.GIT:
                 command = "git pull"
         else:
-            if self.vcs == VCS.HG:
-                clone_command = "hg clone"
-            elif self.vcs == VCS.GIT:
-                clone_command = "git clone"
+            repo_path.mkdir(parents=True)
+            clone_url = self.clone_url(section)
 
-            command = f"{clone_command} {repo_path}"
+            if self.vcs == VCS.HG:
+                clone_command = f"hg clone {clone_url}"
+            elif self.vcs == VCS.GIT:
+                clone_command = f"git clone {clone_url}"
+
+            command = f"{clone_command} ."
 
         return command
 
@@ -358,13 +361,13 @@ class ReposHandler(object):
                 Color.GOOD.print("--- Code ---")
                 code_command = getattr(repo, method_name)(Section.CODE)
 
-                code_ok = repo.run(code_command)
+                code_ok = repo.run(code_command, section=Section.CODE)
 
             if Section.WIKI in repo.sections:
                 Color.GOOD.print("--- Wiki ---")
                 wiki_command = getattr(repo, method_name)(Section.WIKI)
 
-                wiki_ok = repo.run(wiki_command)
+                wiki_ok = repo.run(wiki_command, section=Section.WIKI)
 
             if code_ok and wiki_ok:
                 repos_ok.append(repo)
