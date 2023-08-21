@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name='student-repos-handler',
-    version='2.1.0',
+    version='2.2.0',
     description='Simple tool to handle multiple repos at once, oriented to the grading of assignments in UCSE DAR',
     long_description=open('README.md').read(),
     author='Juan Pedro Fisanotti',
