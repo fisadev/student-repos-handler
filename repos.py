@@ -303,9 +303,18 @@ class Repo:
         Decide wether a filter applies to this repo.
         """
         filters = [f.lower() for f in filters]
+        yes_filters = [f for f in filters if not f.startswith("not:")]
+        not_filters = [f.replace("not:", "") for f in filters if f.startswith("not:")]
 
         long_description = self.long_description().lower()
-        return any(f in long_description for f in filters)
+        return (
+            (
+                any(f in long_description for f in yes_filters)
+                if yes_filters
+                else True
+            )
+            and not any(f in long_description for f in not_filters)
+        )
 
 
 class ReposHandler(object):
