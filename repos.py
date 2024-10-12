@@ -568,7 +568,7 @@ class ReposHandler(object):
         print("repos wiki EDITOR FILE FILTERS")
         print("repos wiki_web BROWSER URL FILTERS")
         print("repos server BROWSER FILTERS")
-        print("repos revive_server BROWSER FILTERS")
+        print("repos revive_server FILTERS")
         print("repos run \"COMMAND\" FILTERS")
         print()
 
